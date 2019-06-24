@@ -1,22 +1,11 @@
 package main
 
-import (
-	"io"
-	"net/http"
+import "net/http"
 
-	"video_server/api/defs"
+func sendErrorResponse(w http.ResponseWriter)  {
 
-	"github.com/gin-gonic/gin/json"
-)
-
-func sendErrorResponse(w http.ResponseWriter, errResp defs.ErrorResponse) {
-	w.WriteHeader(errResp.HttpSC)
-	resStr, _ := json.Marshal(&errResp.Error)
-	io.WriteString(w, string(resStr))
 }
 
-func sendNormalResponse(w http.ResponseWriter, resp string, sc int) {
-	w.WriteHeader(sc)
-	io.WriteString(w, resp)
+func sendNormalResponse(w http.ResponseWriter)  {
 
 }

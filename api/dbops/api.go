@@ -2,74 +2,65 @@ package dbops
 
 import (
 	"database/sql"
-	_ "database/sql"
 	"log"
-	"time"
-
-	"video_server/api/defs"
-
-	"video_server/api/utils"
-
 	_ "github.com/go-sql-driver/mysql"
+	_ "database/sql"
+	"time"
+	"video_server/api/defs"
+	"video_server/api/utils"
 )
 
-func AddUserCredential(loginNmae string, pwd string) error {
-	stmtIns, err := dbConn.Prepare("INSERT INTO user (login_name, pwd) values (?, ?)")
-	if err != nil {
-		return err
-	}
-	_, err = stmtIns.Exec(loginNmae, pwd)
-	if err != nil {
-		return err
-	}
-	defer stmtIns.Close()
-	return nil
+
+func AddUserCredential(loginName string, pwd string) error {
+		stmtIns, err := dbConn.Prepare("insert into users (login_name, pwd) values (?, ?)")
+		if err != nil{
+			return err
+		}
+		stmtIns.Exec(loginName, pwd)
+		stmtIns.Close()
+		return nil
 }
 
-func GetUserCredential(loginName string) (string, error) {
-	stmtOut, err := dbConn.Prepare("SELECT pwd from user WHERE login_name = ?")
-	if err != nil {
-		log.Printf("%s", err)
+func GetUserCredential(loginName string) (string, error)  {
+	stmtOut, err := dbConn.Prepare("select pwd from users where login_name = ?")
+	if err != nil{
+		log.Printf( "%s", err)
 		return "", err
 	}
 	var pwd string
-	err = stmtOut.QueryRow(loginName).Scan(&pwd)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-	defer stmtOut.Close()
+	stmtOut.QueryRow(loginName).Scan(&pwd)
+	stmtOut.Close()
 	return pwd, nil
 }
 
 func DeleteUser(loginName string, pwd string) error {
-	stmtDel, err := dbConn.Prepare("DELETE FROM user WHERE login_name = ? AND pwd = ?")
-	if err != nil {
-		log.Printf("DeleteUser error: %s", err)
+	stmtDel, err := dbConn.Prepare("DELETE from users where login_name=? and pwd = ?")
+	if err != nil{
+		log.Printf("%s", err)
 		return err
 	}
 	_, err = stmtDel.Exec(loginName, pwd)
-	if err != nil {
+	if err != nil{
 		return err
 	}
 	defer stmtDel.Close()
 	return nil
 }
 
-func AddVideo(aid int, name string) (*defs.VideoInfo, error) {
+func AddNewVideo(aid int, name string) (*defs.VideoInfo, error) {
 	// create uuid
 	vid, err := utils.NewUUID()
-	if err != nil {
+	if err != nil{
 		return nil, err
 	}
-	// createtime -> db ->
 	t := time.Now()
 	ctime := t.Format("Jan 02 2006, 15:04:05") // M D y, HH:MM:SS
-	stmtIns, err := dbConn.Prepare(`INSERT INTO video_info (id, author_id, name, display_ctime VALUES (?, ?, ?, ?)) `)
-	if err != nil {
+	stmtIns, err := dbConn.Prepare(`insert into video_info (id, author_id, name, display_ctime) values (?, ?, ?, ?)`)
+	if err != nil{
 		return nil, err
 	}
 	_, err = stmtIns.Exec(vid, aid, name, ctime)
-	if err != nil {
+	if err != nil{
 		return nil, err
 	}
 	res := &defs.VideoInfo{Id: vid, AuthorId: aid, Name: name, DisplayCtime: ctime}
@@ -77,29 +68,88 @@ func AddVideo(aid int, name string) (*defs.VideoInfo, error) {
 	return res, nil
 }
 
-func GetVideo(vid int) (*defs.VideoInfo, error) {
-	stmtOut, err := dbConn.Prepare("SELECT id, author_id, name, display_ctime FROM video_info WHERE id=?")
-	if err != nil {
+
+func GetVideoInfo(vid string) (*defs.VideoInfo, error) {
+	stmtOut, err := dbConn.Prepare("SELECT author_id, name, display_ctime FROM video_info WHERE id=?")
+
+	var aid int
+	var dct string
+	var name string
+
+	err = stmtOut.QueryRow(vid).Scan(&aid, &name, &dct)
+	if err != nil && err != sql.ErrNoRows{
 		return nil, err
 	}
-	var id, display_ctime, name string
-	var author_id int
-	err = stmtOut.QueryRow(vid).Scan(id, author_id, name, display_ctime)
-	if err != nil {
-		return nil, err
+
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	res := &defs.VideoInfo{Id: id, AuthorId: author_id, Name: name, DisplayCtime: display_ctime}
+
 	defer stmtOut.Close()
-	return res, err
+
+	res := &defs.VideoInfo{Id: vid, AuthorId: aid, Name: name, DisplayCtime: dct}
+
+	return res, nil
 }
 
-func AddComments(vid string, aid int, content string) error {
-	id, err := utils.NewUUID()
+
+func ListVideoInfo(uname string, from, to int) ([]*defs.VideoInfo, error) {
+	stmtOut, err := dbConn.Prepare(`SELECT video_info.id, video_info.author_id, video_info.name, video_info.display_ctime FROM video_info 
+		INNER JOIN users ON video_info.author_id = users.id
+		WHERE users.login_name = ? AND video_info.create_time > FROM_UNIXTIME(?) AND video_info.create_time <= FROM_UNIXTIME(?) 
+		ORDER BY video_info.create_time DESC`)
+
+
+	var res []*defs.VideoInfo
+
+	if err != nil {
+		return res, err
+	}
+
+	rows, err := stmtOut.Query(uname, from, to)
+	if err != nil {
+		log.Printf("%s", err)
+		return res, err
+	}
+
+	for rows.Next() {
+		var id, name, ctime string
+		var aid int
+		if err := rows.Scan(&id, &aid, &name, &ctime); err != nil {
+			return res, err
+		}
+
+		vi := &defs.VideoInfo{Id: id, AuthorId: aid, Name: name, DisplayCtime: ctime}
+		res = append(res, vi)
+	}
+
+	defer stmtOut.Close()
+
+	return res, nil
+}
+
+func DeleteVideoInfo(vid string) error {
+	stmtDel, err := dbConn.Prepare("DELETE FROM video_info WHERE id=?")
 	if err != nil {
 		return err
 	}
-	stmtIns, err := dbConn.Prepare("INSERT INT comments (id, video_id, author_id, content) VALUES (?, ?, ?, ?)")
+
+	_, err = stmtDel.Exec(vid)
 	if err != nil {
+		return err
+	}
+
+	defer stmtDel.Close()
+	return nil
+}
+
+func AddNewComments(vid string, aid int, content string) error {
+	id, err := utils.NewUUID()
+	if err != nil{
+		return err
+	}
+	stmtIns, err := dbConn.Prepare("insert into comments (id, video_id, author_id, content) values (?, ?, ?, ?)")
+	if err != nil{
 		return err
 	}
 	_, err = stmtIns.Exec(id, vid, aid, content)
@@ -110,28 +160,21 @@ func AddComments(vid string, aid int, content string) error {
 	return nil
 }
 
-func ListComments(vid string, from, to int) ([]*defs.Comment, error) {
-	stmtOut, err := dbConn.Prepare(
-		`SELECT comments.id, user.login_name, comments.content FROM comments
-				INNER JOIN user on comments.author_id = user.id WHERE comments.video_id = ?
-				AND comments.time > FROM_UNIXTIME(?) AND comments.time <= FROM_UNIXTIME(?);`)
-	if err != nil {
-		return nil, err
-	}
+func ListComments(vid string, limit, offset int) ([]*defs.Comment, error) {
+	stmtOut, err := dbConn.Prepare(`select comments.id, users.login_name, comments.content from comments
+										inner join users on comments.author_id = users.id where video_id='123456' limit ? offset ?`)
 	var res []*defs.Comment
-	rows, err := stmtOut.Query(vid, from, to)
-	if err != nil {
-		return nil, err
+	rows, err := stmtOut.Query(limit, offset)
+	if err != nil{
+		return res, err
 	}
 	for rows.Next() {
 		var id, name, content string
-		if err := rows.Scan(&id, &name, &content); err != nil {
-			return nil, err
+		if err := rows.Scan(&id, &name, &content); err != nil{
+			return res, err
 		}
 		c := &defs.Comment{Id: id, VideoId: vid, Author: name, Content: content}
 		res = append(res, c)
 	}
-	defer stmtOut.Close()
 	return res, nil
-
 }
