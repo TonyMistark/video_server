@@ -33,6 +33,28 @@ func GetUserCredential(loginName string) (string, error)  {
 	return pwd, nil
 }
 
+func GetUser(username string) (*defs.User, error) {
+	stmtOut, err := dbConn.Prepare("select id, pwd from users where login_name = ?")
+	if err != nil{
+		log.Printf("GetUser: %v", err)
+		return nil, err
+	}
+	var id, pwd string
+	err = stmtOut.QueryRow(username).Scan(&id, &pwd)
+	if err != nil && err != sql.ErrNoRows{
+		log.Printf("Query User error: %v", err)
+		return nil, err
+	}
+	if err == sql.ErrNoRows{
+		log.Printf("GetUser: not exists username: %s", username)
+	}
+	res := &defs.User{Id:id, LoginName:username, Pwd:pwd}
+	defer stmtOut.Close()
+	return res, nil
+
+
+}
+
 func DeleteUser(loginName string, pwd string) error {
 	stmtDel, err := dbConn.Prepare("DELETE from users where login_name=? and pwd = ?")
 	if err != nil{
@@ -161,8 +183,19 @@ func AddNewComments(vid string, aid int, content string) error {
 }
 
 func ListComments(vid string, limit, offset int) ([]*defs.Comment, error) {
-	stmtOut, err := dbConn.Prepare(`select comments.id, users.login_name, comments.content from comments
-										inner join users on comments.author_id = users.id where video_id='123456' limit ? offset ?`)
+	stmtOut, err := dbConn.Prepare(`select 
+											 comments.id, users.login_name, comments.content 
+										   from 
+										  	  comments
+										   inner join 
+											  users 
+										   on 
+											  comments.author_id = users.id 
+										   where 
+										  	  video_id='123456' limit ? offset ?
+										   order by 
+											   comments.time 
+											DESC`)
 	var res []*defs.Comment
 	rows, err := stmtOut.Query(limit, offset)
 	if err != nil{
