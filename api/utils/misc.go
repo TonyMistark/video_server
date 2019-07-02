@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"net/http"
 	"log"
-	"avenssi/config"
+	"ice/config"
 )
 
 func NewUUID() (string, error) {
@@ -34,7 +34,7 @@ func SendDeleteVideoRequest(id string) {
 	url := "http://" + addr + "/video-delete-record/" + id
 	_, err := http.Get(url)
 	if err != nil {
-		log.Printf("Sending deleting video request error: %s", err)
+		log.Printf("Sending deleting video request id: %s, error: %s", id, err)
 	}
 }
 

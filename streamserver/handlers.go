@@ -24,6 +24,10 @@ func streamHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 	w.Header().Set("Content-Type", "video/mp4")
 	http.ServeContent(w, r, "", time.Now(), video)
 	defer video.Close()
+
+
+	targetUrl := "http:/x/b/c" + p.ByName("vid-id")
+	http.Redirect(w, r, targetUrl, 301)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -50,6 +54,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		sendErrorResponse(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
+	ossfn := "video/" + fn
+	path := "./videos/" + fn
+	bn := "ice-video"
+	ret := UploadToOss(ossfn, path, bn)
+	if !ret {
+		sendErrorResponse(w, http.StatusInternalServerError, "Internal Service Error")
+		return
+	}
+	os.Remove(path)
+
 	w.WriteHeader(http.StatusCreated)
 	io.WriteString(w, "Uploaded successfully")
 

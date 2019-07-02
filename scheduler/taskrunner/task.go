@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"video-server-go/scheduler/ossops"
 	"video_server/scheduler/dbops"
 )
 
@@ -13,6 +14,13 @@ func deleteVideo(vid string) error {
 	if err != nil && !os.IsNotExist(err){
 		log.Printf("Deleting video error: %v", err)
 		return err
+	}
+	ossfn := "videos/" + vid
+	bn := "ice-osss"
+	ok := ossops.DeleteObject(ossfn, bn)
+	if !ok{
+		log.Printf("Deleting video error, oss operation failed")
+		return errors.New("Deleting video error!")
 	}
 	return nil
 }
